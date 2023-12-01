@@ -1,7 +1,7 @@
 from concurrent.futures import ProcessPoolExecutor
 import random
 from transformers import  LlamaTokenizer
-tokenizer = LlamaTokenizer.from_pretrained('/workspace/Xuxiangjun/Model_WiNGPT_FT/WiNGPT-002-0819/')
+tokenizer = LlamaTokenizer.from_pretrained('/Model_FT/WiNGPT-002-0819/')
 special_token_list = ["<image>", "<im_start>", "<im_end>"] # used for easy image # replacement
 tokenizer.add_tokens(special_token_list, special_tokens=True)
 
