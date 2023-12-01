@@ -7,9 +7,8 @@
 5. generate部分，因为用了原始的大语言模型，所以在输入时接受纯文本输入
 '''
 
-# deepspeed --master_addr 172.16.0.94 --master_port 5050 --include localhost:0,1,2,3,4,5,6,7  /workspace/Xuxiangjun/Nlp_2023/Multi-Modal-Model/Visualmodel_Sft.py
+# deepspeed --master_addr 172.xx.94 --master_port 5050 --include localhost:0,1,2,3,4,5,6,7  /Nlp_2023/Multi-Modal-Model/Visualmodel_Sft.py
 import os
-os.chdir('/workspace/Xuxiangjun/Nlp_2023/Multi-Modal-Model/')
 
 import torch
 from datasets import load_dataset
@@ -26,9 +25,8 @@ warnings.filterwarnings("ignore")
 torch.manual_seed(2023)
 
 para_dict = {
-            "lm_model_name_or_path":"/workspace/Xuxiangjun/Model_WinGPT_pretrain/Chinese_llama2_7B/epoch3/",
+            "lm_model_name_or_path":"/Model_pretrain/Chinese_llama2_7B/epoch3/",
             "vision_model_name_or_path":"/data/public/clip-vit-large-patch14/",
-            "checkpoint_path":"/workspace/Xuxiangjun/Model_WiNGPT_FT/multi-modal-llama7B/",
             "use_flash_attention_2":True,
             "use_cache":False,
             "max_seq_len":4096,
@@ -86,7 +84,7 @@ data_type:
 {'text':'data_text'}
 '''
 
-instruction_dataset = load_dataset("json", data_files="/workspace/Xuxiangjun/Nlp_2023/Multi-Modal-Model/data/visual_data_instructions.json", split="train", cache_dir="/workspace/cache_dir/")
+instruction_dataset = load_dataset("json", data_files="/Nlp_2023/Multi-Modal-Model/data/visual_data_instructions.json", split="train", cache_dir="/workspace/cache_dir/")
 tokenized_dataset = instruction_dataset.map(tokenize, remove_columns=instruction_dataset.column_names, num_proc=32, keep_in_memory=False)
 
 train_size = int(0.99 * len(tokenized_dataset))
