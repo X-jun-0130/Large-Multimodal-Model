@@ -73,7 +73,7 @@ def get_mt(ins_list, max_len=600):
         instructions_list.append(dd_s)
     return instructions_list
 
-winning_clean_v2 = [json.loads(k)['output'] for k in open('./sft/multi_turn/sharegpt_wingpt_clean_v2.jsonl', 'r', encoding='utf-8')]
+winning_clean_v2 = [json.loads(k)['output'] for k in open('./sft/multi_turn/clean_v2.jsonl', 'r', encoding='utf-8')]
 multi_data = [k for k in get_mt(winning_clean_v2, 800)]
 
 
