@@ -73,11 +73,11 @@ def get_mt(ins_list, max_len=600):
         instructions_list.append(dd_s)
     return instructions_list
 
-winning_clean_v2 = [json.loads(k)['output'] for k in open('/data/private/WAIR/dataset/已整理数据/wndata_sft/sft/multi_turn/sharegpt_wingpt_clean_v2.jsonl', 'r', encoding='utf-8')]
+winning_clean_v2 = [json.loads(k)['output'] for k in open('./sft/multi_turn/sharegpt_wingpt_clean_v2.jsonl', 'r', encoding='utf-8')]
 multi_data = [k for k in get_mt(winning_clean_v2, 800)]
 
 
-universal_single_filelist = ['/data/private/WAIR/dataset/已整理数据/wndata_sft/sft/single_turn/', '/data/private/WAIR/dataset/已整理数据/wndata_sft/med_sft/single_turn/']
+universal_single_filelist = ['./sft/single_turn/', './med_sft/single_turn/']
 text_instructions = []
 
 for universal_single_file in universal_single_filelist:
@@ -152,21 +152,9 @@ def get_input(image_instructions):
 image-text-data
 
 读取各图片文件，处理成地址信息
-
-llava_instruct_150k.json 157712 157712
-conversation_58k.json 56681 214393
-Medical-Checkup-Report-OCR.json 20011 234404
-detail_23k.json 23240 257644
-ChiMed-VL-Instruction.json 152603 410247
-mathvista.json 1000 411247
-donut_vqa_ISynHMP.json 1400 412647
-sharegpt4v_instruct_gpt4-vision_cap100k.json 102025 467352
-chinese_text_recognition.json 400000 617352
-complex_reasoning_77k.json 76643 693995
-seedbench.json 14233 708228
 '''
 
-image_path = '/workspace/Xuxiangjun/Images/'
+image_path = './Images/'
 image_dict ={}
 
 for k in os.listdir(image_path):
@@ -174,7 +162,7 @@ for k in os.listdir(image_path):
     image_dict[k] = {j:image_file+j for j in os.listdir(image_file)}
 
 image_instructions = []
-json_path = '/workspace/Xuxiangjun/Nlp_2023/Visual_Data/instructions/'
+json_path = './Nlp_2023/Visual_Data/instructions/'
 for jf in os.listdir(json_path):
     json_list = json.load(open(json_path + jf, 'r', encoding='utf-8'))
     random.shuffle(json_list)
@@ -216,7 +204,7 @@ new_data_all = get_chunk(datalist, 2048)
 print(len(new_data_all))
 print(new_data_all[1000])
 
-with open('/workspace/Xuxiangjun/Nlp_2023/Multi-Modal-Model/data/visual_data_instructions.json', 'a', encoding='utf-8') as target_file:
+with open('./data/visual_data_instructions.json', 'a', encoding='utf-8') as target_file:
     for i in tqdm(range(len(new_data_all))):
         item = new_data_all[i]
         if item[0].count(sepcial_token) == len(item[1]): #判断处理数据是否正确
