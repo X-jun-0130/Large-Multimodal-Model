@@ -4,11 +4,8 @@ import os
 from tqdm import tqdm
 
 end_token = '</s>'
-sepcial_token = '<image>'
+sepcial_token = '<image>' #使用special-token在文本指令中代替图片的位置
 
-
-SingleTurn_Count = 20000
-MultiTurn_Count = 150000
 
 '''
 text_data
@@ -179,7 +176,7 @@ data_all = []
 
 for x in range(len(image_instructions)):
     line, image_list = image_instructions[x]
-
+    # 将纯文本指令拼接到图文指令中
     if x < len(text_instructions):
         text_ins = text_instructions[x]
     else:
@@ -210,3 +207,4 @@ with open('./data/visual_data_instructions.json', 'a', encoding='utf-8') as targ
         if item[0].count(sepcial_token) == len(item[1]): #判断处理数据是否正确
             _t = convert_to_target_format(item[0], item[1])
             target_file.write(json.dumps(_t, ensure_ascii=False) + '\n')
+#最终指令形式：{"text": "User: <im_start><image><im_end>\n这个肿块的位置在哪里？请根据图中内容简洁作答。</s>\n Assistant: 左侧中央区域。</s>\n User: <im_start><image><im_end>\n标题中所指的是哪一颗牙齿？请尽可能简洁地回答。</s>\n Assistant: 左上第一臼齿。</s>\n User: 图片中庆祝的主要事件是什么?\n<im_start><image><im_end></s>\n Assistant: 该图中庆祝的主要事件是美国陆军的生日,如旗饼和军人疲劳的出现所显示。</s>\n User: 蛋糕是什么样子?</s>\n Assistant: 蛋糕與美國國旗相似,暗示了美國陸軍的主題。</s>\n User: 参加这个活动有成年人和孩子吗?</s>\n Assistant: 是的,这张照片捕捉了各种年龄的人们,包括成年人和孩子,参加这个活动。</s>\n User: 那个疲倦的人在蛋糕旁边做什么?</s>\n Assistant: 疲劳的人朝着蛋糕伸出手来,可能表明他正在切蛋糕或提供蛋糕。</s>\n User: 庆祝活动期间,客人如何安排在桌旁?</s>\n Assistant: 客人正站在一张用红布覆盖的长桌旁,他们似乎聚集来见证蛋糕切或服务的过程。</s>\n User: 使用了什么类型的显微镜来捕捉这些图像？请根据图中内容尽量简洁作答。\n<im_start><image><im_end></s>\n Assistant: 荧光显微镜。</s>\n User: <im_start><image><im_end>\nCan you describe the main features of this image for me?</s>\n Assistant: The image captures a serene day at the Citrus Heights Water District,located at6230.The building itself is a single-story structure,painted in a calming shade of beige.Its design is modern and welcoming,with a curved entrance that adds a unique architectural element.\n\nTwo large orange spheres flank the entrance,their vibrant color contrasting beautifully with the building's beige exterior.These spheres,along with three others scattered across the parking lot,add a playful touch to the scene.\n\nThe American flag,flying at half-mast on a flagpole,adds a solemn note to the otherwise cheerful setting.The blue sky overhead is clear and bright,hinting at good weather.In the background,trees can be seen,their green foliage adding a touch of nature to the urban landscape.\n\nOverall,the image presents a harmonious blend of architecture and nature,underlined by the striking orange spheres that dot the premises.</s>", "image_list": ["/workspace/Xuxiangjun/Images/pmc_vqa/PMC2894136_pntd-0000726-g005_67838.jpg", "/workspace/Xuxiangjun/Images/pmc_vqa/PMC7204013_Fig2_164782.jpg", "/workspace/Xuxiangjun/Images/coco-2017/000000258882.jpg", "/workspace/Xuxiangjun/Images/pmc_vqa/PMC3440378_pone-0043463-g003_154434.jpg", "/workspace/Xuxiangjun/Images/coco-2017/000000199669.jpg"]}
