@@ -2,6 +2,7 @@
 
 ### 本项目参考
 [DeepSpeed-VisualChat](https://github.com/microsoft/DeepSpeedExamples/tree/master/applications/DeepSpeed-VisualChat)
+
 [LlaVA](https://github.com/haotian-liu/LLaVA)
 
 ### 模型方案
@@ -23,5 +24,22 @@
 - 优势
   - 采用dsvl的图文拼接方案，所以支持任意的图片输入，如：多轮多图，多轮单图等等
   - 语言模型的能力得到大幅保留，并且实际使用时，支持纯文本的输入输出，理论上一个模型真正的做到文本模型与多模态模型
+
+- 劣势
+  - 模型整体代码方案基于DSVL进行改动而来，在推理时仍需要加载初始预训练大语言模型，部署很不方便 
   
+
+  ### 实现细节
+  - 数据处理
+    - 仅图文数据训练会使语言模型原语言能力遭受遗忘，故在制作数据集时，增加了一定数量的文本指令集
+    - 增加三个special-token，来定义图片在文本中的图片信息
+    - 将图文指令与文本指令拼接到一定长度(2048token)进入模型进行训练
   
+  - 模型
+    - 采用llava的图像层方案抽取vis-encoder倒数第二层信息进入线性映射层
+    - 线性映射层采用两层，并增加LaryNorm提高模型训练时的稳定型
+    - 大语言模型方面不做任何的变动
+      
+  - 模型微调
+    - 使用transformers中的trainer模型重写了微调的代码，使用deepspeed进行训练
+    - 训练3个epoch，初始lr=3e-5，实际中发现lr可能过大，第二个epoch就发现了过拟合   
