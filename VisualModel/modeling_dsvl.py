@@ -1,14 +1,11 @@
 import torch
 import torch.nn.functional as F
 from transformers import AutoConfig
-from transformers import CLIPVisionModel
 from transformers import LlamaForCausalLM
-# from VisualModel.third_party_model.hf_model.modeling_llama import LlamaForCausalLM
-# from VisualModel.third_party_model.hf_model.configuration_llama import LlamaConfig
+from VisualModel.clip_encoder import CLIPVisionTower
 from VisualModel.qwen_clip import VisionTransformer
 from torch import nn
 from torch.nn import  CrossEntropyLoss
-import copy
 import os
 import sys
 
@@ -43,29 +40,24 @@ def create_dsvl_model_and_transforms(
         vis_encoder.load_state_dict(torch.load(os.path.join(args['vision_model_name_or_path'], 'pytorch_model.bin'), map_location='cpu'), strict=True)
         vis_config.hidden_size = 4096 # we need to change the hidden size to 4096
     elif 'clip' in args['vision_model_name_or_path'].lower():
-        vis_encoder = CLIPVisionModel.from_pretrained(args['vision_model_name_or_path']) 
-        vis_config = vis_encoder.config
+        vis_encoder = CLIPVisionTower(args['vision_model_name_or_path'], -2, 'patch', delay_load=True)
+        vis_encoder.load_model()
+        vis_config = vis_encoder.config 
     else:
         raise ValueError("We currently only support qwen's modifed clip and other clip models")
      
     tokenizer = text_tokenizer
 
-    lang_config.max_position_embeddings = args['max_seq_len']
-    
-    lang_decoder = LlamaForCausalLM.from_pretrained(args['lm_model_name_or_path'],  use_cache =args['use_cache'], use_flash_attention_2=args['use_flash_attention_2']).cuda()
+    lang_decoder = LlamaForCausalLM.from_pretrained(args['lm_model_name_or_path'],  use_cache =args['use_cache'], use_flash_attention_2=args['use_flash_attention_2'])
 
     if lang_config.vocab_size < len(tokenizer):
         lang_config.vocab_size = len(tokenizer)
         lang_decoder.resize_token_embeddings(len(tokenizer))
 
-    decoder_name = 'llama'
-
     model = DeepSpeedViLModel(vis_encoder, lang_decoder, \
                                 tokenizer, \
                                 vis_config=vis_config, \
-                                decoder_name=decoder_name, \
                                 lang_config=lang_config, \
-                                max_seq_length=args['max_seq_len'],
                                 args=args)
     
     return model,  tokenizer
@@ -76,84 +68,54 @@ class DeepSpeedViLModel(nn.Module):
                     lang_decoder,
                     tokenizer,
                     vis_config=None, 
-                    decoder_name='Llama',
                     lang_config=None,
-                    max_seq_length=1024,
                     args=None):
         super().__init__()
-        self.vis_encoder = vis_encoder
-         
-        self.lang_decoder = lang_decoder 
-        self.tokenizer = tokenizer 
-        self.args = args
-        self._enable_special_token()
+        self.vis_encoder = vis_encoder #图像层
+        self.lang_decoder = lang_decoder #语言层
 
-        self.lang_config = lang_config
-        self._get_model_stat(decoder_name)
-        lang_embed = self._languag_embedding()
-
-        self.max_seq_length = max_seq_length
-        if lang_embed is None:
-            print ('randomly initialized a language embedding')
-            self.lang_embed = nn.Embedding(self.lang_config.vocab_size,\
-                                            self.hidden_size,\
-                                            self.pad_token_id) # randomly initialized language embedder
-        else:
-            self.lang_embed = lang_embed
-
-        self.projection = self.build_projection(vis_config, self.lang_config.hidden_size)   
-        self._init_weight()
+        self.emd_tokens = self.lang_decoder.get_input_embeddings() #词向量模块
         
+        self.tokenizer = tokenizer 
+        self.lang_config = lang_config
+        self.vocab_size = getattr(self.lang_config, 'vocab_size')
+        self.args = args
 
+        self._enable_special_token()
+        self.projection = self.build_projection(vis_config, self.lang_config.hidden_size) #线性映射层   
+        self._init_weight() #冻结
+        
         # get padding token embedding
         self.padding_embedding = None 
         self.vis_encoder_update = None
 
-
     def _enable_special_token(self):
-        self.DEFAULT_IMAGE_TOKEN_ID = self.tokenizer.convert_tokens_to_ids('<image>')
-
-    def _get_model_stat(self, model_name):   
-        config_dic = {
-            'llama-2': ['max_position_embeddings','num_hidden_layers'],
-            'llama': ['max_position_embeddings','num_hidden_layers']
-        }
-        pos_name, layer_name = config_dic[model_name][0], config_dic[model_name][1]
-        self.n_positions = getattr(self.lang_config, pos_name)
-        self.num_layer = getattr(self.lang_config, layer_name)
-        self.hidden_size  = getattr(self.lang_config, 'hidden_size')
-        self.vocab_size = getattr(self.lang_config, 'vocab_size')
-        
-    def _languag_embedding(self):
-        token_embedding = None
-        for name, module in self.lang_decoder.named_modules():
-            if isinstance(module, nn.Embedding):
-                try:
-                    # z3 shape
-                    rows = module.weight.ds_shape[0]
-                except:
-                    rows = module.weight.size()[0]
-                     
-                if rows == self.vocab_size:
-                    token_embedding = copy.deepcopy(module)
-        return token_embedding
-     
-        
+        self.DEFAULT_IMAGE_TOKEN_ID = self.tokenizer.convert_tokens_to_ids('<|image|>')
+  
     def _init_weight(self):
-        self.vis_encoder.requires_grad_(False)  
+        self.vis_encoder.requires_grad_(False) 
+        self.projection.requires_grad_(True)  
         self.lang_decoder.requires_grad_(True)  
-        self.lang_embed.requires_grad_(True)   
-        self.projection.requires_grad_(True) 
-        
-
+    
     def build_projection(self, vis_config, lang_dim):
         if self.args['vis_proj'] == 'vit':
             output =  VisProjection_vit(vis_config, lang_dim=lang_dim)
             return output 
-        elif self.args['vis_proj'] == 'baseline':
-            return nn.Sequential( 
-                            nn.Linear(vis_config.hidden_size, lang_dim), # an example implementation
-                            nn.LayerNorm(lang_dim, eps=1e-12))
+        elif 'baseline' in  self.args['vis_proj']:
+            if int(self.args['vis_proj'][-1]) == 1:
+                return nn.Sequential( 
+                                nn.Linear(vis_config.hidden_size, lang_dim), # an example implementation
+                                nn.LayerNorm(lang_dim, eps=1e-12)
+                                )
+            else:
+                mlp_depth = int(self.args['vis_proj'][-1])
+                modules = [nn.Linear(vis_config.hidden_size, lang_dim)]
+                for _ in range(1, mlp_depth):
+                    modules.append(nn.GELU())
+                    modules.append(nn.Linear(lang_dim, lang_dim))
+                modules.append(nn.LayerNorm(lang_dim, eps=1e-12))
+                return nn.Sequential(*modules)
+
         elif self.args['vis_proj'] == 'perceiver':
             return VisProjection_perceiver(vis_config, lang_dim=lang_dim)
 
@@ -185,7 +147,7 @@ class DeepSpeedViLModel(nn.Module):
             if len(img_pos_list) == 0:
                 continue # there is no image probably it is a pure text insturction
             
-            cur_lang = self.lang_embed(cur_lang) # get the real embedding
+            cur_lang = self.emd_tokens(cur_lang) # get the real embedding
  
             for img_i, img_pos in zip(torch.flip(cur_img, dims=(0,)), torch.flip(img_pos_list, dims=(0,))): # do it reversely so that we can easily insert the image
                 lang_pre_img_embed = cur_lang[initial_pos:img_pos]
@@ -211,8 +173,8 @@ class DeepSpeedViLModel(nn.Module):
             output_input_labels.append(input_labels_full.unsqueeze(0))
 
         if self.padding_embedding is None:
-            with torch.no_grad():
-                self.padding_embedding = self.lang_embed(torch.tensor(self.tokenizer.pad_token_id).to(lang.device).unsqueeze(0)).unsqueeze(0).detach()
+            # with torch.no_grad():
+            self.padding_embedding = self.emd_tokens(torch.tensor(self.tokenizer.pad_token_id).to(lang.device).unsqueeze(0)).unsqueeze(0).detach()
 
         def pad_tensor_list(tensor_list, pad_token_id, pad_vec=False):
             max_len = max([tensor.size(1) for tensor in tensor_list])
@@ -238,9 +200,9 @@ class DeepSpeedViLModel(nn.Module):
 
         return torch.cat(output_lang, dim=0), torch.cat(output_attention_mask, dim=0), torch.cat(output_input_labels, dim=0)
 
-    def forward(self, img, lang,
+    def forward(self, images, input_ids,
             attention_mask=None,
-            input_labels=None,
+            labels=None,
             image_num=1,
             past_key_values=None,
             use_cache=False,
@@ -249,32 +211,14 @@ class DeepSpeedViLModel(nn.Module):
             return_dict=True):
         
         assert attention_mask is not None, "attention mask is required"
-        assert input_labels is not None, "input labels is required"
+        assert labels is not None, "labels is required"
 
-        if self.vis_encoder_update is None:
-            self.vis_encoder_update = False # default is False
-            for p in self.vis_encoder.parameters():
-                if p.requires_grad:
-                    self.vis_encoder_update = True
-        # this part for now does not require gradient
-        if self.vis_encoder_update:
-            # update vis encoder
-            img_feature = self.vis_encoder(img) 
-            if not isinstance(img_feature, torch.Tensor):
-                img_feature = img_feature.last_hidden_state
-        else:
-            # do not update vis encoder
-            with torch.no_grad():
-                img_feature = self.vis_encoder(img)
-                if not isinstance(img_feature, torch.Tensor):
-                    img_feature = img_feature.last_hidden_state
-
-        # [batch_size, 257, hidden_size]         
-        img_proj = self.projection(img_feature) 
+        with torch.no_grad():
+            img_feature = self.vis_encoder(images)
+        img_proj = self.projection(img_feature) # [batch_size, 576, hidden_size] 
         
-        hidden_states, attention_mask, input_labels = self.concat(img_proj, lang, attention_mask, input_labels, image_num)
-        labels = input_labels   
-
+        hidden_states, attention_mask, labels = self.concat(img_proj, input_ids, attention_mask, labels, image_num)
+ 
         logits = self.lang_decoder(input_ids=None, 
                                 inputs_embeds=hidden_states,
                                 attention_mask=attention_mask,
@@ -299,45 +243,41 @@ class DeepSpeedViLModel(nn.Module):
         loss_fct = CrossEntropyLoss() 
         loss = loss_fct(logits_shift, labels_shift) 
         
-        return [loss,logits] 
+        return [loss, logits]
+
     
     @torch.no_grad()
     def generate(self, 
-            img=None,
-            lang=None,
+            images=None,
+            input_ids=None,
             attention_mask=None,
-            input_labels=None,
-            generation_length=128,
             generation_kwargs={}, # add some meaningful default values
             ):
-        assert lang.size()[0] == 1, "only support batch size == 1 for now"
-        assert lang is not None, "input_ids is required"
+        assert input_ids.size()[0] == 1, "only support batch size == 1 for now"
+        assert input_ids is not None, "input_ids is required"
 
-    
-        if img is None:
-            output = self.lang_decoder.generate(input_ids=lang,
-                                        max_new_tokens=generation_length, 
-                                        **generation_kwargs)
-        
-        else:
-            attention_mask = torch.ones_like(lang)
-            input_labels = torch.ones_like(lang) 
-            # this part for now does not require gradient
-            img_feature = self.vis_encoder(img) 
-            
-            if not isinstance(img_feature, torch.Tensor):
-                img_feature = img_feature.last_hidden_state
-            img_proj = self.projection(img_feature)
-            
-            hidden_states, attention_mask, input_labels = self.concat(img_proj, lang, attention_mask, input_labels, image_num=[img.size(0)], do_generation=True)
-            
-            output = self.lang_decoder.generate(input_ids=None,
-                                                attention_mask=attention_mask,
-                                                inputs_embeds=hidden_states,
-                                                max_new_tokens=generation_length, # this is the number of tokens you want to generate
+        if images is None:
+            output = self.lang_decoder.generate(input_ids=input_ids,
                                                 **generation_kwargs)
             
-        return self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
+            return self.tokenizer.batch_decode(output)[0].split('\n Assistant:')[-1].strip(self.tokenizer.eos_token)
+        
+        else:
+            attention_mask = torch.ones_like(input_ids)
+            input_labels = torch.ones_like(input_ids) 
+            
+            # this part for now does not require gradient
+            img_feature = self.vis_encoder(images) 
+            img_proj = self.projection(img_feature)
+            
+            hidden_states, _, _ = self.concat(img_proj, input_ids, attention_mask, input_labels, image_num=[images.size(0)], do_generation=True)
+   
+            output = self.lang_decoder.generate(input_ids=None,
+                                                attention_mask=None,
+                                                inputs_embeds=hidden_states,
+                                                **generation_kwargs)
+            
+            return self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
 
 
     def gradient_checkpointing_enable(self):
