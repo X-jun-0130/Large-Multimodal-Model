@@ -11,18 +11,15 @@ import warnings
 warnings.filterwarnings("ignore")
 
 para_dict = {
-            "lm_model_name_or_path":"/Model_pretrain/Chinese_llama2_7B/epoch3/",
-            "vision_model_name_or_path":"/data/public/clip-vit-large-patch14/",
-            "checkpoint_path":"/Model_FT/multi-modal-llama7B/",
+            "lm_model_name_or_path":"/Model_WinGPT_pretrain/Chinese_llama2_7B/epoch3/",
+            "vision_model_name_or_path":"/data/public/clip-vit-large-patch14-336/",
+            "checkpoint_path":"/Model_WiNGPT_FT/multi-modal-llama7B/",
             "num_gpus":1,
             "device":'cuda',
             "max_gpu_memory":None,
             "use_flash_attention_2":False,
             "use_cache":False,
-            "max_seq_len":4096,
-            "vis_proj":"baseline",
-            "host":"0.0.0.0",
-            "port":5051,
+            "vis_proj":"baseline_2"
             }
 
 
@@ -35,14 +32,12 @@ def load_image(image_file):
     return image
 
 
-
-
 tokenizer = LlamaTokenizer.from_pretrained(para_dict['lm_model_name_or_path'])
 image_processor = CLIPImageProcessor.from_pretrained(para_dict['vision_model_name_or_path'])
 
 
 #add special token
-special_token_list = ["<image>", "<im_start>", "<im_end>"] # used for easy image # replacement
+special_token_list = ["<|image|>", "<|im_start|>", "<|im_end|>"] # used for easy image # replacement
 tokenizer.add_tokens(special_token_list, special_tokens=True)
 
 tokenizer.padding_side = 'right'
@@ -60,7 +55,7 @@ def get_model_input(data_format):
         n = len(k['image_path'])
         image_str = ''
         for _ in range(n):
-            image_str += '<image>\n'
+            image_str += '<|image|>\n'
         
         line = 'User: '+image_str+k['user']+'</s>\n '+'Assistant:' + k['assistant']
 
@@ -79,14 +74,14 @@ def get_model_input(data_format):
         image_tensor = None
 
     input_lint = '</s>\n '.join(input_list)
-    input_lint = input_lint.replace('<image>', '<im_start><image><im_end>')
+    input_lint = input_lint.replace('<|image|>', '<|im_start|><|image|><|im_end|>')
     print(input_lint)
     input_ids = tokenizer.encode(input_lint,return_tensors='pt')
 
-
     return image_tensor, input_ids
 
-data_format = [{'image_path':['https://img2.baidu.com/it/u=2705133129,1120911323&fm=253&fmt=auto&app=138&f=JPEG?w=609&h=500'], 'user':'描述一下这副美丽的图片.', 'assistant':''},
+
+data_format = [{'image_path':['https://lmg.jj20.com/up/allimg/1114/0406210Z024/2104060Z024-5-1200.jpg'], 'user':'描述一下这副美丽的图片.', 'assistant':''},
                ]
 
 image_tensor, input_ids = get_model_input(data_format)
@@ -98,11 +93,8 @@ model,  _  = create_dsvl_model_and_transforms(
 
 model.load_state_dict(torch.load(os.path.join(para_dict['checkpoint_path'], 'pytorch_hf.bin'), map_location='cpu'), strict=False) 
 
-model = model.to('cuda')
 model = model.eval()
+model = model.to('cpu')
 
-# outputs = model.lang_decoder.generate(input_ids, max_new_tokens=56)
-# output = tokenizer.decode(outputs[0])
-
-outputs = model.generate(img=image_tensor, lang=input_ids,  generation_length=128)
+outputs = model.generate(images=image_tensor, input_ids=input_ids,  generation_kwargs={'repetition_penalty':1.1, "max_new_tokens":512})
 print(outputs)
