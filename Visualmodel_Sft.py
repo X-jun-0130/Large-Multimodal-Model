@@ -31,8 +31,7 @@ para_dict = {
             "use_cache":False,
             "use_flash_attention_2":False,
             "max_seq_len":4096,
-            "vis_proj":"baseline_2",
-            "device":'cpu',
+            "vis_proj":"baseline_2"
             }
 
 IGNORE_INDEX = -100
