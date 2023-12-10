@@ -82,7 +82,7 @@ def tokenize(text):
 data_process
 
 data_type:
-{'text':'data_text'}
+{'text':'data_text','image_list':[]}
 '''
 
 instruction_dataset = load_dataset("json", data_files="/Nlp_2023/Multi-Modal-Model/data/visual_data.json", split="train", cache_dir="/workspace/cache_dir/")
