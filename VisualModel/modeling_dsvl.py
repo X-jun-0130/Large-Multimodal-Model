@@ -95,7 +95,8 @@ class DeepSpeedViLModel(nn.Module):
     def _init_weight(self):
         self.vis_encoder.requires_grad_(False) 
         self.projection.requires_grad_(True)  
-        self.lang_decoder.requires_grad_(True)  
+        self.lang_decoder.requires_grad_(True)
+        self.emd_tokens.weight.requires_grad_(True)
     
     def build_projection(self, vis_config, lang_dim):
         if self.args['vis_proj'] == 'vit':
