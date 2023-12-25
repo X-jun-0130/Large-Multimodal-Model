@@ -49,3 +49,11 @@
   - 模型对于简单的花花草草的识别，倒是问题不大，但是ocr能力较难训练
   - 目前高质量的中文图文数据集几乎没有，使用的llava翻译的语料，训练的模型幻觉问题明显
   - 需要制作图文不符的数据集来增加模型的泛化性
+
+
+### 五、Examples
+
+<details>
+<summary>示例1</summary>
+<img src="https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/example1.jpg"/> 
+</details>
