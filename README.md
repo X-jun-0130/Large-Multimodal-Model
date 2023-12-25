@@ -64,6 +64,6 @@
 </details>
 
 <details>
-<summary>示例2-多图识别</summary>
+<summary>示例3-多图识别</summary>
 <img src="https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/example3.jpg"/> 
 </details>
