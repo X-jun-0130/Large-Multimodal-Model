@@ -54,6 +54,16 @@
 ### 五、Examples
 
 <details>
-<summary>示例1</summary>
+<summary>示例1-多图识别</summary>
 <img src="https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/example1.jpg"/> 
+</details>
+
+<details>
+<summary>示例2-多轮对话</summary>
+<img src="https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/example2.jpg"/> 
+</details>
+
+<details>
+<summary>示例2-多图识别</summary>
+<img src="https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/example3.jpg"/> 
 </details>
