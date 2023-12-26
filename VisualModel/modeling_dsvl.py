@@ -60,7 +60,18 @@ def create_dsvl_model_and_transforms(
                                 vis_config=vis_config, \
                                 lang_config=lang_config, \
                                 args=args)
-    
+    if args['type'] == 'FT':
+        state_dict = torch.load(os.path.join(args['checkpoint_path'], 'pytorch_model.bin'), map_location='cpu')
+        for key in state_dict:
+            if "projection" in key:
+                model.load_state_dict({key: state_dict[key]}, strict=False)
+        del state_dict
+    elif args['type'] == 'Inference':
+        state_dict = torch.load(os.path.join(args.checkpoint_path, 'pytorch_hf.bin'), map_location='cpu')
+        for key in state_dict:
+            if "projection" in key or "lang_decoder" in key:#将训练好的投影层参数和语言模型参数加载进模型
+                model.load_state_dict({key: state_dict[key]}, strict=False)
+        del state_dict
     return model,  tokenizer
 
 
