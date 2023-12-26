@@ -1,7 +1,8 @@
 import torch
 import torch.nn.functional as F
 from transformers import AutoConfig
-from transformers import LlamaForCausalLM
+from threading import Thread
+from transformers import LlamaForCausalLM, AutoModelForCausalLM, TextIteratorStreamer,GenerationConfig
 from VisualModel.clip_encoder import CLIPVisionTower
 from VisualModel.qwen_clip import VisionTransformer
 from torch import nn
@@ -251,33 +252,35 @@ class DeepSpeedViLModel(nn.Module):
     def generate(self, 
             images=None,
             input_ids=None,
-            attention_mask=None,
+            stream=None,
             generation_kwargs={}, # add some meaningful default values
             ):
         assert input_ids.size()[0] == 1, "only support batch size == 1 for now"
         assert input_ids is not None, "input_ids is required"
 
         if images is None:
-            output = self.lang_decoder.generate(input_ids=input_ids,
-                                                **generation_kwargs)
-            
-            return self.tokenizer.batch_decode(output)[0].split('\n Assistant:')[-1].strip(self.tokenizer.eos_token)
-        
+            hidden_states = self.emd_tokens(input_ids)
         else:
             attention_mask = torch.ones_like(input_ids)
             input_labels = torch.ones_like(input_ids) 
-            
             # this part for now does not require gradient
             img_feature = self.vis_encoder(images) 
             img_proj = self.projection(img_feature)
             
             hidden_states, _, _ = self.concat(img_proj, input_ids, attention_mask, input_labels, image_num=[images.size(0)], do_generation=True)
-   
-            output = self.lang_decoder.generate(input_ids=None,
-                                                attention_mask=None,
-                                                inputs_embeds=hidden_states,
-                                                **generation_kwargs)
-            
+
+        if stream:
+            streamer = TextIteratorStreamer(self.tokenizer, skip_prompt=True)
+            Thread(target=self.lang_decoder.generate, kwargs=dict(
+                inputs_embeds=hidden_states, streamer=streamer,
+                generation_config=GenerationConfig.from_dict(generation_kwargs),
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id= self.tokenizer.eos_token_id,
+            )).start()
+            return streamer
+        else:
+            output = self.lang_decoder.generate(inputs_embeds=hidden_states,
+                                                    **generation_kwargs)
             return self.tokenizer.batch_decode(output, skip_special_tokens=True)[0]
 
 
