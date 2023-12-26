@@ -19,7 +19,8 @@ para_dict = {
             "max_gpu_memory":None,
             "use_flash_attention_2":False,
             "use_cache":False,
-            "vis_proj":"baseline_2"
+            "vis_proj":"baseline_2",
+            "type":"Inference",
             }
 
 
@@ -90,11 +91,8 @@ model,  _  = create_dsvl_model_and_transforms(
                                             text_tokenizer = tokenizer,
                                             args=para_dict,
                                             )
-
-model.load_state_dict(torch.load(os.path.join(para_dict['checkpoint_path'], 'pytorch_hf.bin'), map_location='cpu'), strict=False) 
-
 model = model.eval()
 model = model.to('cpu')
 
-outputs = model.generate(images=image_tensor, input_ids=input_ids,  generation_kwargs={'repetition_penalty':1.1, "max_new_tokens":512})
+outputs = model.generate(images=image_tensor, input_ids=input_ids, stream=False, generation_kwargs={'repetition_penalty':1.1, "max_new_tokens":512})
 print(outputs)
