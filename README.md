@@ -7,7 +7,8 @@
 
 ### 一、模型方案
 模型基于DSVL以及llava两方案进行改动，算法整体上接近llava，由于llava的实现仅支持单图，针对这一问题利用DSVL的图文拼接方案进行补充；
-训练时，冻结图像层，仅微调线性映射(两层)和语言模型层
+训练时，分为两阶段：1.只训练投影层(两个线性层+LayerNorm)；2.冻结图像层，微调投影层和语言模型层
+[模型架构](https://github.com/X-jun-0130/Large-Multimodal-Model/blob/main/example/model.jpg)
 
 ### 二、主要改动
 ```
