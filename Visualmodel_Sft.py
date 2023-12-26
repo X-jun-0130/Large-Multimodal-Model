@@ -6,6 +6,18 @@
 4. 图文concat之后，embedding根据position_ids加了一次位置向量，这个操作略显奇怪，因为embedding进入大模型后会加上旋转位置向量的；等于它的这个模型加了两次位置向量，然后generate操作时进入模型仅仅只加了一次位置向量
 5. 不改变原生大模型的结构之后，可以使用flash_attention加速训练
 6. generate部分，因为用了原始的大语言模型，所以在输入时接受纯文本输入
+
+预训练PT：
+除线性隐射层外，其他全部冻结
+
+只需要改动_init_weight中的代码即可
+
+微调FT:
+只冻结图像层
+
+预训练时 lr=5e-4 训练一个epoch
+微调时  lr=1e-5 训练二个epoch
+
 '''
 
 # deepspeed --master_addr 172.xx.94 --master_port 5050 --include localhost:0,1,2,3,4,5,6,7  Nlp_2023/Multi-Modal-Model/Visualmodel_Sft.py
@@ -31,7 +43,8 @@ para_dict = {
             "use_cache":False,
             "use_flash_attention_2":False,
             "max_seq_len":4096,
-            "vis_proj":"baseline_2"
+            "vis_proj":"baseline_2",
+            'type':'FT'
             }
 
 IGNORE_INDEX = -100
