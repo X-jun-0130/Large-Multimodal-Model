@@ -50,7 +50,7 @@ def create_dsvl_model_and_transforms(
     tokenizer = text_tokenizer
 
     lang_decoder = LlamaForCausalLM.from_pretrained(args['lm_model_name_or_path'],  use_cache =args['use_cache'], use_flash_attention_2=args['use_flash_attention_2'])
-
+    #lang_decoder = LlamaForCausalLM(config=lang_config) #Inference时使用这行代码，不需要再加载原生预训练语言模型
     if lang_config.vocab_size < len(tokenizer):
         lang_config.vocab_size = len(tokenizer)
         lang_decoder.resize_token_embeddings(len(tokenizer))
