@@ -1,5 +1,8 @@
 # Large-Multimodal-Model
 
+transformers==4.33.3
+deepspeed==0.11.0
+
 ### 本项目参考
 [DeepSpeed-VisualChat](https://github.com/microsoft/DeepSpeedExamples/tree/master/applications/DeepSpeed-VisualChat)
 
